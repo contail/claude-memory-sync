@@ -8,7 +8,7 @@ Claude Code stores memory locally at `~/.claude/projects/.../memory/`. When you 
 
 ## Solution
 
-Git private repo + symlink + session hooks. That's it.
+Git private repo + symlink + smart hooks. That's it.
 
 ```
 Machine A                    Machine B
@@ -18,9 +18,6 @@ Machine A                    Machine B
               ↕ git push/pull ↕
           github.com/you/claude-memory (private)
 ```
-
-- **Session start** → auto `git pull` (fetch latest memory)
-- **Session end** → auto `commit + push` (sync changes)
 
 ## Setup
 
@@ -36,102 +33,80 @@ gh repo create claude-memory --private --confirm
 curl -fsSL https://raw.githubusercontent.com/contail/claude-memory-sync/main/setup.sh | bash
 ```
 
-Or manually:
+The script will:
+- Clone your repo to `~/claude-memory`
+- Find your Claude memory directory and symlink it
+- Create smart sync scripts with pull cooldown
+- Auto-configure hooks in `settings.json` (requires `jq`)
 
-```bash
-git clone git@github.com:YOUR_USERNAME/claude-memory.git ~/claude-memory
+### 3. On your other machine
 
-# Find your memory path
-MEMORY_PATH=$(find ~/.claude/projects -type d -name memory 2>/dev/null | head -1)
+Run the same script — it detects existing repo memory and sets up the symlink accordingly.
 
-# Move memory to repo + symlink
-cp -r "$MEMORY_PATH" ~/claude-memory/memory
-rm -rf "$MEMORY_PATH"
-ln -s ~/claude-memory/memory "$MEMORY_PATH"
+## How it works
 
-# Initial push
-cd ~/claude-memory && git add -A && git commit -m "Initial memory sync" && git push -u origin main
+### Smart sync (not naive)
+
+**Pull cooldown** — `git pull` only runs if 5+ minutes have passed since the last pull. Opening 10 terminals in a row doesn't mean 10 pulls.
+
+```
+CLAUDE_MEMORY_PULL_COOLDOWN=600  # override to 10 minutes
 ```
 
-### 3. Add hooks to `~/.claude/settings.json`
+**Push on change only** — `git diff --cached --quiet` skips commit/push when nothing changed. Most sessions won't push anything.
 
-Add the `hooks` block to your existing settings:
-
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cd ~/claude-memory && git pull --rebase 2>/dev/null || true"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cd ~/claude-memory && git add -A && git diff --cached --quiet || (git commit -m \"sync $(date +%F-%H%M)\" && git push) 2>/dev/null || true"
-          }
-        ]
-      }
-    ]
-  }
-}
+```
+Session start
+  └→ sync-pull.sh (skip if pulled recently)
+      └→ Claude reads/writes memory via symlink
+          └→ Session end
+              └→ sync-push.sh (skip if no changes)
 ```
 
-### 4. On your other machine
+### What gets synced
 
-```bash
-git clone git@github.com:YOUR_USERNAME/claude-memory.git ~/claude-memory
+| Synced | Not synced |
+|--------|------------|
+| Memory files (*.md) | `.last-pull` timestamp |
+| MEMORY.md index | `bin/` scripts |
+| Project/feedback/reference memories | Sensitive files you `.gitignore` |
 
-MEMORY_PATH=$(find ~/.claude/projects -type d -name memory 2>/dev/null | head -1)
-mv "$MEMORY_PATH" "${MEMORY_PATH}.bak" 2>/dev/null
-ln -s ~/claude-memory/memory "$MEMORY_PATH"
-```
+### Sensitive files
 
-Add the same hooks to that machine's `~/.claude/settings.json`.
-
-Done.
-
-## FAQ
-
-**Q: Do I need to set this up per terminal session?**
-
-No. The symlink is filesystem-level — every Claude Code session on the same machine automatically uses the same synced memory.
-
-**Q: What if two machines edit memory at the same time?**
-
-Memory files are independent (one file per topic), so conflicts are rare. `git pull --rebase` handles most cases automatically. Worst case: a merge conflict you resolve manually once.
-
-**Q: What about sensitive data?**
-
-Use a **private** repo. If you have API tokens in memory, add them to `.gitignore`:
+Add files with secrets to `~/claude-memory/.gitignore`:
 
 ```bash
 echo "memory/reference-sentry.md" >> ~/claude-memory/.gitignore
 ```
 
+## Manual commands
+
+```bash
+~/claude-memory/bin/sync-pull.sh   # force pull now
+~/claude-memory/bin/sync-push.sh   # force push now
+```
+
+## FAQ
+
+**Q: Do I need to set this up per terminal session?**
+
+No. The symlink is filesystem-level — every Claude Code session on the same machine uses the same synced memory.
+
+**Q: I open 5 terminals at once. Does it pull 5 times?**
+
+No. The pull cooldown (default 5 min) prevents redundant pulls. Only the first session triggers a pull.
+
+**Q: What if two machines edit memory at the same time?**
+
+Memory files are independent (one file per topic), so conflicts are rare. `git pull --rebase` handles most cases. Worst case: a merge conflict you resolve once.
+
 **Q: Can I share memory across a team?**
 
-Yes — use a shared private repo and each team member symlinks to it. Be aware that memories are personal context, so team-shared memory works best for project-level knowledge, not personal preferences.
+Yes — use a shared private repo. Works best for project-level knowledge (architecture, conventions), not personal preferences.
 
-## How it works
+**Q: What if I don't have `jq`?**
 
-```
-Claude Code session start
-  └→ Hook: git pull --rebase (fetch latest)
-      └→ Claude reads memory via symlink
-          └→ Claude writes/updates memory
-              └→ Session end
-                  └→ Hook: git commit + push (sync back)
-```
+The script prints the hooks JSON for you to paste into `settings.json` manually.
 
 ## Alternatives considered
 
