@@ -108,6 +108,24 @@ Yes — use a shared private repo. Works best for project-level knowledge (archi
 
 The script prints the hooks JSON for you to paste into `settings.json` manually.
 
+## Examples
+
+See [`examples/`](examples/) for a complete reference:
+
+```
+examples/
+├── memory/
+│   ├── MEMORY.md                  # Index file — links to all memories
+│   ├── user_profile.md            # type: user — role, expertise, preferences
+│   ├── feedback_code_style.md     # type: feedback — corrections & confirmed patterns
+│   ├── project_api_migration.md   # type: project — ongoing work, deadlines, decisions
+│   └── reference_infra.md         # type: reference — dashboards, docs, ticket boards
+├── settings.json                  # ~/.claude/settings.json with hooks pre-configured
+└── .gitignore                     # Exclude sync internals + sensitive files
+```
+
+Each memory file uses frontmatter (`name`, `description`, `type`) so Claude knows when to recall it. See the files for real-world examples of how to structure each type.
+
 ## Alternatives considered
 
 | Approach | Pros | Cons |
