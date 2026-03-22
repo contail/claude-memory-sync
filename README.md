@@ -43,6 +43,46 @@ The script will:
 
 Run the same script — it detects existing repo memory and sets up the symlink accordingly.
 
+### Windows setup
+
+Run `setup.bat` as Administrator (symlink requires admin):
+
+```cmd
+git clone https://github.com/contail/claude-memory-sync.git %TEMP%\claude-memory-sync
+%TEMP%\claude-memory-sync\setup.bat git@github.com:YOUR_USERNAME/claude-memory.git
+```
+
+Then add hooks to `%USERPROFILE%\.claude\settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File %USERPROFILE%\\claude-memory\\bin\\sync-pull.ps1"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File %USERPROFILE%\\claude-memory\\bin\\sync-push.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
 ## How it works
 
 ### Smart sync (not naive)
@@ -82,8 +122,13 @@ echo "memory/reference-sentry.md" >> ~/claude-memory/.gitignore
 ## Manual commands
 
 ```bash
-~/claude-memory/bin/sync-pull.sh   # force pull now
-~/claude-memory/bin/sync-push.sh   # force push now
+# macOS / Linux
+~/claude-memory/bin/sync-pull.sh
+~/claude-memory/bin/sync-push.sh
+
+# Windows (PowerShell)
+powershell -File $env:USERPROFILE\claude-memory\bin\sync-pull.ps1
+powershell -File $env:USERPROFILE\claude-memory\bin\sync-push.ps1
 ```
 
 ## FAQ
