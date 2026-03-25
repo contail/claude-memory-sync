@@ -103,6 +103,14 @@ Session start
               └→ sync-push.sh (skip if no changes)
 ```
 
+> **Important:** The Stop hook pushes _file changes_, not conversation history. Claude must write memory files during the session for there to be anything to push. If a session ends without Claude saving any memory, nothing gets synced — this is a Claude Code limitation, not a bug.
+>
+> To maximize memory coverage, add this to your project's `CLAUDE.md`:
+> ```
+> When important information comes up during conversation (decisions, research findings,
+> project context), proactively save it to memory files — don't wait for the user to ask.
+> ```
+
 ### What gets synced
 
 | Synced | Not synced |
@@ -148,6 +156,10 @@ Memory files are independent (one file per topic), so conflicts are rare. `git p
 **Q: Can I share memory across a team?**
 
 Yes — use a shared private repo. Works best for project-level knowledge (architecture, conventions), not personal preferences.
+
+**Q: I had a conversation but nothing was pushed on session end?**
+
+The Stop hook only pushes file changes. If Claude didn't write any memory files during the session, there's nothing to commit. Add a `CLAUDE.md` instruction to save memory proactively (see [How it works](#how-it-works)), or ask Claude to "save this to memory" before ending the session.
 
 **Q: What if I don't have `jq`?**
 
